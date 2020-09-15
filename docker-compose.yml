@@ -1,0 +1,55 @@
+version: '3'
+
+services:
+  database:
+    container_name: app-database
+    image: postgres:11
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASS}
+      - POSTGRES_DB=${DB_NAME}
+    ports:
+      - 5432:5432
+
+  migration:
+    container_name: app-migration
+    image: flyway/flyway:6.5.1-alpine
+    volumes:
+      - ./app-backend/setup/migration:/flyway/sql
+    command: -url=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME} -user=${DB_USER} -password=${DB_PASS} -connectRetries=60 migrate
+    depends_on:
+      - database
+
+  web:
+    container_name: app-frontend
+    build: ./app-frontend
+    ports:
+      - 8080:80
+    depends_on:
+      - migration
+
+  app:
+    container_name: app-backend
+    build:
+      context: ./app-backend
+      args:
+        - JBOSS_SECRET
+    environment:
+      - POSTGRES_HOST=${DB_HOST}
+      - POSTGRES_PORT=${DB_PORT}
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASS=${DB_PASS}
+    volumes:
+    - ${PWD}/app-backend/target/app-backend.war:/opt/jboss/wildfly/standalone/deployments/app-backend.war:rw
+    ports:
+      - 8090:8080
+      - 9990:9990
+      - 8787:8787
+    depends_on:
+      - web
+
+
+
+
+
